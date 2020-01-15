@@ -1,5 +1,12 @@
 #include "TCPClient.h"
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#include <iostream>
+#include "exceptions.h"
 
+//geeksforgeeks.org/socket-programming-cc/
 
 /**********************************************************************************************
  * TCPClient (constructor) - Creates a Stdin file descriptor to simplify handling of user input. 
@@ -7,6 +14,7 @@
  **********************************************************************************************/
 
 TCPClient::TCPClient() : Client() {
+
 }
 
 /**********************************************************************************************
@@ -26,7 +34,27 @@ TCPClient::~TCPClient() {
  **********************************************************************************************/
 
 void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
+    //int sock = 0, valread;
+    //struct sockaddr_in serv_addr;
+    char *hello = "hello from client";
+    char buffer[1024] = {0};
 
+    if((_connectionFd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        throw socket_error("Socket creation error\n");
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port);
+
+    if(inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) <= 0) {
+        throw socket_error("Invalid address or address not supported\n");
+    }
+
+    if(connect(_connectionFd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        throw socket_error("Connection error\n");
+    }
+
+    write(_connectionFd, hello, strlen(hello));
 }
 
 /**********************************************************************************************
@@ -38,6 +66,17 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
  **********************************************************************************************/
 
 void TCPClient::handleConnection() {
+    char buffer[100] = {0};
+    while(true) {
+        //looking for data from server
+        read(_connectionFd, buffer, socket_bufsize);
+
+        std::cout << buffer << "\n";
+        char clientBuf[stdin_bufsize] = {0};
+        std::cin.getline(clientBuf, stdin_bufsize);
+        write(_connectionFd, clientBuf, strlen(clientBuf));
+
+    }
    
 }
 
@@ -48,6 +87,9 @@ void TCPClient::handleConnection() {
  **********************************************************************************************/
 
 void TCPClient::closeConn() {
+    if(close(_connectionFd) == -1) {
+        throw socket_error("Error closing socket\n");
+    }
 }
 
 

@@ -4,6 +4,8 @@
 #include "Server.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <list> 
+#include <memory>
 
 class TCPServer : public Server 
 {
@@ -16,8 +18,11 @@ public:
    void shutdown();
 
 private:
-   int server_fd, new_socket, valread;
-   struct sockaddr_in address;
+   std::list<std::unique_ptr<int>> _connlist;
+
+   int _server_fd, _new_socket, _valread;
+   struct sockaddr_in _address;
+   int addrlen = sizeof(_address);
  
 
 

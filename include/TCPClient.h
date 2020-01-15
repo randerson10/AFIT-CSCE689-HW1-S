@@ -2,6 +2,8 @@
 #define TCPCLIENT_H
 
 #include <string>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include "Client.h"
 
 // The amount to read in before we send a packet
@@ -20,6 +22,8 @@ public:
    virtual void closeConn();
 
 private:
+   int _connectionFd = 0;
+   struct sockaddr_in serv_addr;
 
 };
 

@@ -1,10 +1,13 @@
 #include "TCPServer.h"
 #include "exceptions.h"
 #include <arpa/inet.h>
-//#include <sys/socket.h>
-
+#include <string.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
+#include <fcntl.h>
 
+
+//geeksforgeeks.org/socket-programming-cc/
 //for testing
 #include <iostream>
 
@@ -24,23 +27,27 @@ TCPServer::~TCPServer() {
  **********************************************************************************************/
 
 void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
-    //int server_fd, new_socket, valread;
-    //struct sockaddr_in address;
-    //int opt = 1;
-    //int addrlen = sizeof(address);
-    //char buffer[1024] = {0};
 
-    if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    if((_server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
         throw socket_error("Socket failed\n");
     }
 
-    address.sin_family = AF_INET;
-    if(inet_pton(AF_INET, ip_addr, &address.sin_addr.s_addr) <= 0){
+    _address.sin_family = AF_INET;
+    if(inet_pton(AF_INET, ip_addr, &_address.sin_addr.s_addr) <= 0){
         throw socket_error("Invaliad address\n");
     }
-    address.sin_port = htons(port);
+    _address.sin_port = htons(port);
 
-    if(bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+    int flags;
+    //flags = fcntl(_server_fd, F_GETFL);
+    //if(fcntl(_server_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+      //  throw socket_error("fcntl failed\n");
+    //}
+    if(ioctl(_server_fd, FIONBIO, &flags) == -1 ){
+        throw socket_error("ioctl failed\n");
+    }
+
+    if(bind(_server_fd, (struct sockaddr *)&_address, sizeof(_address)) < 0) {
         throw socket_error("Bind failed\n");
     }
    
@@ -55,17 +62,32 @@ void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
  **********************************************************************************************/
 
 void TCPServer::listenSvr() {
-    if(listen(server_fd, 3) < 0) {
-        throw socket_error("Listen failure\n");
-    }
 
-    if((new_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)sizeof(address))) < 0){
-        throw socket_error("Accet failure\n");
-    }
+    while(true) {
+        if(listen(_server_fd, 20) < 0) {
+            throw socket_error("Listen failure\n");
+        }
+        
+        if((_new_socket = accept(_server_fd, (struct sockaddr *)&_address, (socklen_t*)&addrlen)) < 0){
+            throw socket_error("Accept failure\n");
+        }
+        
+        _connlist.push_back(std::make_unique<int>(_new_socket));
 
-    char buffer[1024] = {0};
-    read(new_socket, buffer, 1024);
-    std::cout << buffer << "\n";
+        std::cout << "new connection " << _new_socket << "\n";
+
+        char buffer[1024] = {0};
+        read(_new_socket, buffer, 1024);
+        std::cout << "stuff read on server side " << buffer << "\n";
+
+        char* hello = "Hello from server\n\nPossible commands:\n1\n2\n3\n4\n5\npasswd\nexit\menu\n";
+        write(_new_socket, hello, strlen(hello));
+
+        read(_new_socket, buffer, 1024);
+        std::cout << "more came in " << buffer << "\n";
+
+    }
+    
 }
 
 /**********************************************************************************************
@@ -75,7 +97,7 @@ void TCPServer::listenSvr() {
  **********************************************************************************************/
 
 void TCPServer::shutdown() {
-    if(close(server_fd) == -1) {
+    if(close(_server_fd) == -1) {
         throw socket_error("Error closing socket\n");
     }
 }
