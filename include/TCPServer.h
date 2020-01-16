@@ -4,7 +4,7 @@
 #include "Server.h"
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <list> 
+#include <vector> 
 #include <memory>
 
 class TCPServer : public Server 
@@ -18,13 +18,14 @@ public:
    void shutdown();
 
 private:
-   std::list<std::unique_ptr<int>> _connlist;
+   std::vector<std::unique_ptr<int>> _connlist;
 
-   int _server_fd, _new_socket, _valread;
+   int _server_fd;
+   int _max_clients = 20;
    struct sockaddr_in _address;
    int addrlen = sizeof(_address);
  
-
+   fd_set _readfds; 
 
 };
 

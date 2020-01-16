@@ -39,22 +39,22 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
     char *hello = "hello from client";
     char buffer[1024] = {0};
 
-    if((_connectionFd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if((this->_connectionFd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         throw socket_error("Socket creation error\n");
     }
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
 
-    if(inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) <= 0) {
+    if(inet_pton(AF_INET, ip_addr, &this->serv_addr.sin_addr) <= 0) {
         throw socket_error("Invalid address or address not supported\n");
     }
 
-    if(connect(_connectionFd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if(connect(this->_connectionFd, (struct sockaddr *)&this->serv_addr, sizeof(this->serv_addr)) < 0) {
         throw socket_error("Connection error\n");
     }
 
-    write(_connectionFd, hello, strlen(hello));
+    write(this->_connectionFd, hello, strlen(hello));
 }
 
 /**********************************************************************************************
@@ -69,12 +69,12 @@ void TCPClient::handleConnection() {
     char buffer[100] = {0};
     while(true) {
         //looking for data from server
-        read(_connectionFd, buffer, socket_bufsize);
+        read(this->_connectionFd, buffer, socket_bufsize);
 
         std::cout << buffer << "\n";
         char clientBuf[stdin_bufsize] = {0};
         std::cin.getline(clientBuf, stdin_bufsize);
-        write(_connectionFd, clientBuf, strlen(clientBuf));
+        write(this->_connectionFd, clientBuf, strlen(clientBuf));
 
     }
    
@@ -87,7 +87,7 @@ void TCPClient::handleConnection() {
  **********************************************************************************************/
 
 void TCPClient::closeConn() {
-    if(close(_connectionFd) == -1) {
+    if(close(this->_connectionFd) == -1) {
         throw socket_error("Error closing socket\n");
     }
 }
