@@ -79,6 +79,7 @@ void TCPClient::handleConnection() {
                 if(FD_ISSET(STDIN_FILENO, &this->_read_fds)) {
                     std::string cmd;
                     std::getline(std::cin,cmd);
+
                     int n = cmd.length();
                     char cmdBuf[n+1];
                     strncpy(cmdBuf, cmd.c_str(), n);
