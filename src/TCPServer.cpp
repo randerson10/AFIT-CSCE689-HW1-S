@@ -118,11 +118,8 @@ void TCPServer::listenSvr() {
                 char buffer[1025];  //data buffer of 1K   
                 //Check if it was for closing, and also read the incoming message  
                 if ((valread = read(sd, buffer, 1024)) == 0) {   
-                    //Somebody disconnected, so close the socket and mark as 0 in list for reuse 
-                    if(close(sd) == -1) {
-                        throw socket_error("Error closing client socket\n");
-                    } 
-                    this->_client_socket[i] = 0;   
+                    //Somebody disconnected
+                    closeClient(sd, i);
                     std::cout << "A client disconnected\n";
                 } else {   
                     //Otherwise there is a request that needs to be handled
@@ -182,11 +179,7 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
    } else if(cmd.compare("exit") == 0) {
         char *response = "Disconnecting client\n\0";
         send(clientFd, response, strlen(response), 0);
-        
-        if(close(clientFd) == -1) {
-            throw socket_error("Error closing client socket\n");
-        }
-        this->_client_socket[clientSocketNum] = 0;
+        closeClient(clientFd, clientSocketNum);
    } else if(cmd.compare("menu") == 0) {
         sendCommands(clientFd);
    } else {
@@ -203,6 +196,15 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
 
 void TCPServer::shutdown() {
     if(close(this->_server_fd) == -1) {
-        throw socket_error("Error closing socket\n");
+        throw socket_error("Error closing server socket\n");
     }
+}
+
+void TCPServer::closeClient(int clientFd, int clientSocketNum) {
+    if(close(clientFd) == -1) {
+        throw socket_error("Error closing client socket\n");
+    }
+    //debug
+    std::cout << "Closing client socket\n";
+    this->_client_socket[clientSocketNum] = 0;
 }

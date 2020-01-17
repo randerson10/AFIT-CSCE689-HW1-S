@@ -18,6 +18,7 @@ public:
    void shutdown();
    void sendCommands(int clientFd);
    void handleCommands(int clientFd, char *buffer, int cmdSize, int clientSocketNum);
+   void closeClient(int clientFd, int clientSocketNum);
 
 private:
    std::vector<int> _connlist;
