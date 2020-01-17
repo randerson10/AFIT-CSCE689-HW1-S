@@ -55,179 +55,198 @@ void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
 void TCPServer::listenSvr() {
 
 //https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
-
-    int opt = 1;   
-    int  new_socket, activity, valread;
-    std::unique_ptr<int> sd;   
-    int max_sd;   
-    struct sockaddr_in address;   
-         
-    char buffer[1025];  //data buffer of 1K  
-         
+  
+    int  new_socket, activity ,valread ,sd, max_sd;   
+  
     //set of socket descriptors  
-      
+    fd_set readfds;   
          
     //a message  
     char *message = "ECHO Daemon v1.0 \r\n";   
      
     //initialise all client_socket[] to 0 so not checked  
-    for (int i = 0; i < this->_max_clients; i++)   
-    {   
-        this->_connlist.push_back(std::make_unique<int>(0));
- 
+    for (int i = 0; i < this->_max_clients; i++) {   
+        this->_connlist.push_back(0);
+        this->_client_socket[i] = 0;   
     }   
-           
          
+
     //try to specify maximum of 3 pending connections for the master socket  
-    if (listen(this->_server_fd, 3) < 0)   
-    {   
-        perror("listen");   
-        exit(EXIT_FAILURE);   
+    if (listen(this->_server_fd, 3) < 0) {   
+        throw socket_error("Listen failure\n");
     }   
          
     //accept the incoming connection  
     //addrlen = sizeof(address);   
     puts("Waiting for connections ...");   
          
-    while(1)   
-    {   
+    while(true) {   
         //clear the socket set  
-        FD_ZERO(&this->_readfds);   
+        FD_ZERO(&readfds);   
      
         //add master socket to set  
-        FD_SET(this->_server_fd, &this->_readfds);   
+        FD_SET(this->_server_fd, &readfds);   
         max_sd = this->_server_fd;   
              
         //add child sockets to set  
-        for (int i = 0 ; i < this->_max_clients ; i++)   
-        {   
+        for (int i = 0 ; i < this->_max_clients ; i++) {   
             //socket descriptor  
-            sd = std::move(this->_connlist.at(i)); 
-      
+            //sd = this->_connlist.at(i); 
+            sd = this->_client_socket[i];
+                 
             //if valid socket descriptor then add to read list  
-            if(*sd > 0)   
-                FD_SET( *sd , &this->_readfds);   
+            if(sd > 0)   
+                FD_SET( sd , &readfds);   
                  
             //highest file descriptor number, need it for the select function  
-            if(*sd > max_sd)   
-                max_sd = *sd;   
+            if(sd > max_sd)   
+                max_sd = sd;   
         }   
      
         //wait for an activity on one of the sockets , timeout is NULL ,  
         //so wait indefinitely  
-        activity = select( max_sd + 1 , &this->_readfds , NULL , NULL , NULL);   
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 1000;
+        activity = select( max_sd + 1 , &readfds , NULL , NULL , &timeout);   
        
-        if ((activity < 0) && (errno!=EINTR))   
-        {   
-            printf("select error");   
+        if ((activity < 0) && (errno!=EINTR)) {   
+            throw socket_error("Select error\n");
         }   
              
         //If something happened on the master socket ,  
         //then its an incoming connection  
-        if (FD_ISSET(this->_server_fd, &this->_readfds))   
-        {   
-            if ((new_socket = accept(this->_server_fd,  
-                    (struct sockaddr *)&this->_address, (socklen_t*)&this->addrlen))<0)   
-            {   
-                perror("accept");   
-                exit(EXIT_FAILURE);   
+        if (FD_ISSET(this->_server_fd, &readfds)) {   
+            if ((new_socket = accept(this->_server_fd, (struct sockaddr *)&this->_address, (socklen_t*)&this->_addrlen))<0) { 
+                throw socket_error("Accept failure\n");
             }   
              
             //inform user of socket number - used in send and receive commands  
-            printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs 
-                  (address.sin_port));   
+            printf("New connection , socket fd is %d , ip is : %s , port : %d  \n" , new_socket , inet_ntoa(this->_address.sin_addr) , ntohs(this->_address.sin_port));   
            
             //send new connection greeting message  
-            if( send(new_socket, message, strlen(message), 0) != strlen(message) )   
-            {   
-                perror("send");   
-            }   
+            //if( send(new_socket, message, strlen(message), 0) != strlen(message) )   
+            //{   
+            //    perror("send");   
+            //}   
+            TCPServer::sendCommands(new_socket);
                  
             puts("Welcome message sent successfully");   
                  
             //add new socket to array of sockets  
-            this->_connlist.push_back(std::make_unique<int>(new_socket));
-            //for (int i = 0; i < this->_max_clients; i++)   
-            //{   
+            for(int i = 0; i < this->_max_clients; i++) {   
                 //if position is empty  
-               // if( client_socket[i] == 0 )   
-               // {   
-                //    client_socket[i] = new_socket;   
-                //    printf("Adding to list of sockets as %d\n" , i);   
-                         
-                //    break;   
-                //}   
-            //}   
+                if(this->_client_socket[i] == 0 ) {   
+                    this->_client_socket[i] = new_socket;   
+                    printf("Adding to list of sockets as %d\n" , i);     
+                    break;   
+                }   
+            }   
         }   
              
         //else its some IO operation on some other socket 
-        for (int i = 0; i < this->_max_clients; i++)   
-        {   
-std::cout << "right here\n";
-            sd = std::move(this->_connlist.at(i));   
-std::cout << "right after\n";
-            if (FD_ISSET( *sd , &this->_readfds))   
-            {   
+        for (int i = 0; i < this->_max_clients; i++) {   
+            sd = this->_client_socket[i];   
+                 
+            if(FD_ISSET( sd , &readfds)) {  
+                char buffer[1025];  //data buffer of 1K   
                 //Check if it was for closing , and also read the  
                 //incoming message  
-                if ((valread = read( *sd , buffer, 1024)) == 0)   
-                {   
+                if ((valread = read( sd , buffer, 1024)) == 0) {   
                     //Somebody disconnected , get his details and print  
-                    getpeername(*sd , (struct sockaddr*)&address , \ 
-                        (socklen_t*)&addrlen);   
-                    printf("Host disconnected , ip %s , port %d \n" ,  
-                          inet_ntoa(address.sin_addr) , ntohs(address.sin_port));   
+                    getpeername(sd , (struct sockaddr*)&this->_address , (socklen_t*)&this->_addrlen);   
+                    printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(this->_address.sin_addr) , ntohs(this->_address.sin_port));   
                          
                     //Close the socket and mark as 0 in list for reuse  
-                    close( *sd );   
-                    this->_connlist.at(i) = 0;   
+                    close(sd);   
+                    this->_client_socket[i] = 0;   
                 }   
                      
                 //Echo back the message that came in  
-                else 
-                {   
+                else {   
                     //set the string terminating NULL byte on the end  
                     //of the data read  
-                    buffer[valread] = '\0';   
-                    send(*sd , buffer , strlen(buffer) , 0 );   
+                    //buffer[valread] = '\0';   
+                    //send(sd , buffer , strlen(buffer) , 0 );   
+                    handleCommands(sd, buffer, valread, i);
                 }   
             }   
-            std::cout << "after for\n";
         }   
-    }   
+    } 
+}
 
+/**********************************************************************************************
+ * sendCommands - Sends the list of server commands to the clients.
+ *
+ *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
+ **********************************************************************************************/
+void TCPServer::sendCommands(int clientFd){
+    char *message = "ECHO Daemon v1.0 \r\n"; 
+    char *commands = "Server commands:\n\thello\n\t1\n\t2\n\t3\n\t4\n\t5\n\tpasswd\n\texit\n\tmenu\n";
+    if(send(clientFd, commands, strlen(commands), 0) != strlen(commands)){   
+        throw socket_error("Send error\n");
+    } 
+}
 
+/**********************************************************************************************
+ * handleCommands - Processes command from client and sends the correct response.
+ *
+ *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
+ **********************************************************************************************/
+void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clientSocketNum) {
+    std::string cmd = "";
 
-    // fd_set readfds;
-    // int max_sd;
+    for(int i = 0; i < cmdSize-1; i++) {
+        cmd += buffer[i];      
+    }
 
-    // if(listen(this->_server_fd, 3) < 0) {
-    //     throw socket_error("Listen failure\n");
-    // }
-    // while(true) {
-    //     FD_ZERO(&readfds);
-    //     max_sd = this->_server_fd;
-    //     int new_socket;
-    //     if((new_socket = accept(this->_server_fd, (struct sockaddr *)&this->_address, (socklen_t*)&this->addrlen)) < 0){
-    //         throw socket_error("Accept failure\n");
-    //     }
+   if(cmd.compare("hello") == 0) {
+        std::cout << "hello selected\n";
+        char *response = "Hello from server\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("1") == 0) {
+        std::cout << "1 selected\n";
+        char *response = "Option 1\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("2") == 0) {
+        std::cout << "2 selected\n";
+        char *response = "Option 2\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("3") == 0) {
+        std::cout << "3 selected\n";
+        char *response = "Option 3\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("4") == 0){
+        std::cout << "4 selected\n";
+        char *response = "Option 4\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("5") == 0) {
+        std::cout << "5 selected\n";
+        char *response = "Option 5\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("passwd") == 0) {
+        std::cout << "passwd selected\n";
+        char *response = "passwd functionality not yet implemented\n\0";
+        send(clientFd, response, strlen(response), 0);
+   } else if(cmd.compare("exit") == 0) {
+        std::cout << "exit selected\n";
+        char *response = "Disconneting client\n\0";
+        send(clientFd, response, strlen(response), 0);
         
-    //     this->_connlist.push_back(std::make_unique<int>(new_socket));
+        if(close(clientFd) == -1) {
+            throw socket_error("Error closing client socket\n");
+        }
+        this->_client_socket[clientSocketNum] = 0;
+   } else if(cmd.compare("menu") == 0) {
+        std::cout << "menu selected\n";
+        sendCommands(clientFd);
+   } else {
+        std::cout << "invalid\n"; 
+        char *response = "Invalid selection\n\0";
+        send(clientFd,  response, strlen(response), 0);  
+   }
+   
 
-    //     std::cout << "new connection " << new_socket << "\n";
-
-    //     char buffer[1024] = {0};
-    //     read(new_socket, buffer, 1024);
-    //     std::cout << "stuff read on server side " << buffer << "\n";
-
-    //     char* hello = "Hello from server\n\nPossible commands:\n1\n2\n3\n4\n5\npasswd\nexit\nmenu\n";
-    //     write(new_socket, hello, strlen(hello));
-
-    //     read(new_socket, buffer, 1024);
-    //     std::cout << "more came in " << buffer << "\n";
-
-    // }
-    
 }
 
 /**********************************************************************************************

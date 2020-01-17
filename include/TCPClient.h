@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include "Client.h"
 
+
 // The amount to read in before we send a packet
 const unsigned int stdin_bufsize = 50;
 const unsigned int socket_bufsize = 100;
@@ -24,6 +25,7 @@ public:
 private:
    int _connectionFd = 0;
    struct sockaddr_in serv_addr;
+   bool isOpen();
 
 };
 

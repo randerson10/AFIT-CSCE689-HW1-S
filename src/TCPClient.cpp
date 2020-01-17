@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include <fcntl.h>
 #include "exceptions.h"
 
 //geeksforgeeks.org/socket-programming-cc/
@@ -54,7 +55,7 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
         throw socket_error("Connection error\n");
     }
 
-    write(this->_connectionFd, hello, strlen(hello));
+    //write(this->_connectionFd, hello, strlen(hello));
 }
 
 /**********************************************************************************************
@@ -66,18 +67,37 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
  **********************************************************************************************/
 
 void TCPClient::handleConnection() {
-    char buffer[100] = {0};
+    char buffer[socket_bufsize] = {0};
     while(true) {
-        //looking for data from server
-        read(this->_connectionFd, buffer, socket_bufsize);
+        if(isOpen()) {
+            //looking for data from server
+            read(this->_connectionFd, buffer, socket_bufsize);
 
-        std::cout << buffer << "\n";
-        char clientBuf[stdin_bufsize] = {0};
-        std::cin.getline(clientBuf, stdin_bufsize);
-        write(this->_connectionFd, clientBuf, strlen(clientBuf));
+            std::cout << buffer << "\n";
+            //char clientBuf[stdin_bufsize] = {0};
+            //std::cin.getline(clientBuf, stdin_bufsize);
 
+            std::string cmd;
+            std::getline(std::cin,cmd);
+
+            int n = cmd.length();
+            char cmdBuf[n+1];
+            strncpy(cmdBuf, cmd.c_str(), n);
+            cmdBuf[n+1] = '\0';
+
+            write(this->_connectionFd, cmdBuf, n+1);
+        } else {
+            std::cout << "connection not open\n";
+        }
     }
    
+}
+
+bool TCPClient::isOpen() {
+    if((fcntl(this->_connectionFd, F_GETFD) == -1) && errno == EBADF) {
+        return false;
+    } 
+    return true;
 }
 
 /**********************************************************************************************
