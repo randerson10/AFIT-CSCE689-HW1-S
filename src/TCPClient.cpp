@@ -35,11 +35,6 @@ TCPClient::~TCPClient() {
  **********************************************************************************************/
 
 void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
-    //int sock = 0, valread;
-    //struct sockaddr_in serv_addr;
-    char *hello = "hello from client";
-    char buffer[1024] = {0};
-
     if((this->_connectionFd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         throw socket_error("Socket creation error\n");
     }
@@ -54,8 +49,6 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
     if(connect(this->_connectionFd, (struct sockaddr *)&this->serv_addr, sizeof(this->serv_addr)) < 0) {
         throw socket_error("Connection error\n");
     }
-
-    //write(this->_connectionFd, hello, strlen(hello));
 }
 
 /**********************************************************************************************
@@ -72,14 +65,13 @@ void TCPClient::handleConnection() {
         if(isOpen()) {
             //looking for data from server
             read(this->_connectionFd, buffer, socket_bufsize);
+            //output what was received
+            std::cout << buffer;
+            fflush(stdout);
 
-            std::cout << buffer << "\n";
-            //char clientBuf[stdin_bufsize] = {0};
-            //std::cin.getline(clientBuf, stdin_bufsize);
-
+            //read in a line from stdin and format it to send to server
             std::string cmd;
             std::getline(std::cin,cmd);
-
             int n = cmd.length();
             char cmdBuf[n+1];
             strncpy(cmdBuf, cmd.c_str(), n);
@@ -88,9 +80,9 @@ void TCPClient::handleConnection() {
             write(this->_connectionFd, cmdBuf, n+1);
         } else {
             std::cout << "connection not open\n";
+            return;
         }
     }
-   
 }
 
 bool TCPClient::isOpen() {
@@ -101,7 +93,7 @@ bool TCPClient::isOpen() {
 }
 
 /**********************************************************************************************
- * closeConnection - Your comments here
+ * closeConnection - Closes the connection to the server.
  *
  *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
  **********************************************************************************************/

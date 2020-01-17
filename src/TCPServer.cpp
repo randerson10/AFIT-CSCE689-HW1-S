@@ -5,10 +5,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
-
-
-//geeksforgeeks.org/socket-programming-cc/
-//for testing
 #include <iostream>
 
 TCPServer::TCPServer() : Server() {
@@ -51,94 +47,64 @@ void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
  *
  *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
  **********************************************************************************************/
-
+//https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/ was used for the below solution.
 void TCPServer::listenSvr() {
-
-//https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
-  
     int  new_socket, activity ,valread ,sd, max_sd;   
-  
-    //set of socket descriptors  
-    fd_set readfds;   
-         
-    //a message  
-    char *message = "ECHO Daemon v1.0 \r\n";   
-     
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 1000;
+
     //initialise all client_socket[] to 0 so not checked  
     for (int i = 0; i < this->_max_clients; i++) {   
-        this->_connlist.push_back(0);
         this->_client_socket[i] = 0;   
     }   
-         
-
+    
     //try to specify maximum of 3 pending connections for the master socket  
     if (listen(this->_server_fd, 3) < 0) {   
         throw socket_error("Listen failure\n");
-    }   
-         
-    //accept the incoming connection  
-    //addrlen = sizeof(address);   
-    puts("Waiting for connections ...");   
+    }    
          
     while(true) {   
         //clear the socket set  
-        FD_ZERO(&readfds);   
+        FD_ZERO(&this->_readfds);   
      
         //add master socket to set  
-        FD_SET(this->_server_fd, &readfds);   
+        FD_SET(this->_server_fd, &this->_readfds);   
         max_sd = this->_server_fd;   
              
         //add child sockets to set  
         for (int i = 0 ; i < this->_max_clients ; i++) {   
-            //socket descriptor  
-            //sd = this->_connlist.at(i); 
             sd = this->_client_socket[i];
                  
             //if valid socket descriptor then add to read list  
             if(sd > 0)   
-                FD_SET( sd , &readfds);   
+                FD_SET(sd, &this->_readfds);   
                  
             //highest file descriptor number, need it for the select function  
             if(sd > max_sd)   
                 max_sd = sd;   
         }   
      
-        //wait for an activity on one of the sockets , timeout is NULL ,  
-        //so wait indefinitely  
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 1000;
-        activity = select( max_sd + 1 , &readfds , NULL , NULL , &timeout);   
+        //wait for an activity on one of the sockets
+        activity = select(max_sd+1, &this->_readfds, NULL, NULL, &timeout);   
        
         if ((activity < 0) && (errno!=EINTR)) {   
             throw socket_error("Select error\n");
         }   
              
-        //If something happened on the master socket ,  
-        //then its an incoming connection  
-        if (FD_ISSET(this->_server_fd, &readfds)) {   
+        //If something happened on the master socket, then its an incoming connection  
+        if (FD_ISSET(this->_server_fd, &this->_readfds)) {   
             if ((new_socket = accept(this->_server_fd, (struct sockaddr *)&this->_address, (socklen_t*)&this->_addrlen))<0) { 
                 throw socket_error("Accept failure\n");
             }   
-             
-            //inform user of socket number - used in send and receive commands  
-            printf("New connection , socket fd is %d , ip is : %s , port : %d  \n" , new_socket , inet_ntoa(this->_address.sin_addr) , ntohs(this->_address.sin_port));   
-           
-            //send new connection greeting message  
-            //if( send(new_socket, message, strlen(message), 0) != strlen(message) )   
-            //{   
-            //    perror("send");   
-            //}   
-            TCPServer::sendCommands(new_socket);
-                 
-            puts("Welcome message sent successfully");   
+std::cout << "incoming connection\n";
+            sendCommands(new_socket); 
                  
             //add new socket to array of sockets  
             for(int i = 0; i < this->_max_clients; i++) {   
                 //if position is empty  
                 if(this->_client_socket[i] == 0 ) {   
-                    this->_client_socket[i] = new_socket;   
-                    printf("Adding to list of sockets as %d\n" , i);     
+                    this->_client_socket[i] = new_socket;      
                     break;   
                 }   
             }   
@@ -148,26 +114,17 @@ void TCPServer::listenSvr() {
         for (int i = 0; i < this->_max_clients; i++) {   
             sd = this->_client_socket[i];   
                  
-            if(FD_ISSET( sd , &readfds)) {  
+            if(FD_ISSET(sd , &this->_readfds)) {  
                 char buffer[1025];  //data buffer of 1K   
-                //Check if it was for closing , and also read the  
-                //incoming message  
-                if ((valread = read( sd , buffer, 1024)) == 0) {   
-                    //Somebody disconnected , get his details and print  
-                    getpeername(sd , (struct sockaddr*)&this->_address , (socklen_t*)&this->_addrlen);   
-                    printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(this->_address.sin_addr) , ntohs(this->_address.sin_port));   
-                         
-                    //Close the socket and mark as 0 in list for reuse  
-                    close(sd);   
+                //Check if it was for closing, and also read the incoming message  
+                if ((valread = read(sd, buffer, 1024)) == 0) {   
+                    //Somebody disconnected, so close the socket and mark as 0 in list for reuse 
+                    if(close(sd) == -1) {
+                        throw socket_error("Error closing client socket\n");
+                    } 
                     this->_client_socket[i] = 0;   
-                }   
-                     
-                //Echo back the message that came in  
-                else {   
-                    //set the string terminating NULL byte on the end  
-                    //of the data read  
-                    //buffer[valread] = '\0';   
-                    //send(sd , buffer , strlen(buffer) , 0 );   
+                } else {   
+                    //Otherwise there is a request that needs to be handled
                     handleCommands(sd, buffer, valread, i);
                 }   
             }   
@@ -181,7 +138,6 @@ void TCPServer::listenSvr() {
  *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
  **********************************************************************************************/
 void TCPServer::sendCommands(int clientFd){
-    char *message = "ECHO Daemon v1.0 \r\n"; 
     char *commands = "Server commands:\n\thello\n\t1\n\t2\n\t3\n\t4\n\t5\n\tpasswd\n\texit\n\tmenu\n";
     if(send(clientFd, commands, strlen(commands), 0) != strlen(commands)){   
         throw socket_error("Send error\n");
@@ -230,7 +186,7 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("exit") == 0) {
         std::cout << "exit selected\n";
-        char *response = "Disconneting client\n\0";
+        char *response = "Disconnecting client\n\0";
         send(clientFd, response, strlen(response), 0);
         
         if(close(clientFd) == -1) {
@@ -245,8 +201,6 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
         char *response = "Invalid selection\n\0";
         send(clientFd,  response, strlen(response), 0);  
    }
-   
-
 }
 
 /**********************************************************************************************
@@ -260,10 +214,3 @@ void TCPServer::shutdown() {
         throw socket_error("Error closing socket\n");
     }
 }
-
-// bool TCPServer::hasData(long ms_timeout) {
-//     fd_set read_fds
-//     timeout_tv_sec = 0;
-//     timeout.tv_usec = ms_timout;
-//     select()
-// }
