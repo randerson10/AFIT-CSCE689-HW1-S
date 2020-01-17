@@ -54,7 +54,7 @@ void TCPServer::listenSvr() {
     timeout.tv_sec = 0;
     timeout.tv_usec = 1000;
 
-    //initialise all client_socket[] to 0 so not checked  
+    //set all client sockets to zero so they are not checked
     for (int i = 0; i < this->_max_clients; i++) {   
         this->_client_socket[i] = 0;   
     }   
@@ -97,10 +97,10 @@ void TCPServer::listenSvr() {
             if ((new_socket = accept(this->_server_fd, (struct sockaddr *)&this->_address, (socklen_t*)&this->_addrlen))<0) { 
                 throw socket_error("Accept failure\n");
             }   
-std::cout << "incoming connection\n";
+            std::cout << "New connection!\n";
             sendCommands(new_socket); 
                  
-            //add new socket to array of sockets  
+            //add the new client
             for(int i = 0; i < this->_max_clients; i++) {   
                 //if position is empty  
                 if(this->_client_socket[i] == 0 ) {   
@@ -123,6 +123,7 @@ std::cout << "incoming connection\n";
                         throw socket_error("Error closing client socket\n");
                     } 
                     this->_client_socket[i] = 0;   
+                    std::cout << "A client disconnected\n";
                 } else {   
                     //Otherwise there is a request that needs to be handled
                     handleCommands(sd, buffer, valread, i);
@@ -152,40 +153,33 @@ void TCPServer::sendCommands(int clientFd){
 void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clientSocketNum) {
     std::string cmd = "";
 
+    //copying to string for comparison minus the newline
     for(int i = 0; i < cmdSize-1; i++) {
         cmd += buffer[i];      
     }
 
    if(cmd.compare("hello") == 0) {
-        std::cout << "hello selected\n";
-        char *response = "Hello from server\n\0";
+        char *response = "Hello from server!\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("1") == 0) {
-        std::cout << "1 selected\n";
         char *response = "Option 1\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("2") == 0) {
-        std::cout << "2 selected\n";
         char *response = "Option 2\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("3") == 0) {
-        std::cout << "3 selected\n";
         char *response = "Option 3\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("4") == 0){
-        std::cout << "4 selected\n";
         char *response = "Option 4\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("5") == 0) {
-        std::cout << "5 selected\n";
         char *response = "Option 5\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("passwd") == 0) {
-        std::cout << "passwd selected\n";
         char *response = "passwd functionality not yet implemented\n\0";
         send(clientFd, response, strlen(response), 0);
    } else if(cmd.compare("exit") == 0) {
-        std::cout << "exit selected\n";
         char *response = "Disconnecting client\n\0";
         send(clientFd, response, strlen(response), 0);
         
@@ -194,10 +188,8 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
         }
         this->_client_socket[clientSocketNum] = 0;
    } else if(cmd.compare("menu") == 0) {
-        std::cout << "menu selected\n";
         sendCommands(clientFd);
    } else {
-        std::cout << "invalid\n"; 
         char *response = "Invalid selection\n\0";
         send(clientFd,  response, strlen(response), 0);  
    }

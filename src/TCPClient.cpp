@@ -60,9 +60,10 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
  **********************************************************************************************/
 
 void TCPClient::handleConnection() {
-    char buffer[socket_bufsize] = {0};
+    
     while(true) {
         if(isOpen()) {
+            char buffer[socket_bufsize] = {0};
             //looking for data from server
             read(this->_connectionFd, buffer, socket_bufsize);
             //output what was received
@@ -77,14 +78,19 @@ void TCPClient::handleConnection() {
             strncpy(cmdBuf, cmd.c_str(), n);
             cmdBuf[n+1] = '\0';
 
+            //send command to server
             write(this->_connectionFd, cmdBuf, n+1);
         } else {
-            std::cout << "connection not open\n";
+            close(this->_connectionFd);
             return;
         }
     }
 }
 
+/**********************************************************************************************
+ * isOpen - Checks if the server connection is still open. Doesn't seem to work until 2 commands have been sent.
+ *
+ **********************************************************************************************/
 bool TCPClient::isOpen() {
     if((fcntl(this->_connectionFd, F_GETFD) == -1) && errno == EBADF) {
         return false;
