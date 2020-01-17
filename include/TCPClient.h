@@ -27,6 +27,8 @@ private:
    struct sockaddr_in serv_addr;
    bool isOpen();
 
+   fd_set _read_fds;
+
 };
 
 

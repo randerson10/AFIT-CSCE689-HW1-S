@@ -110,7 +110,7 @@ void TCPServer::listenSvr() {
             }   
         }   
              
-        //else its some IO operation on some other socket 
+        //check for some IO operation on some other socket 
         for (int i = 0; i < this->_max_clients; i++) {   
             sd = this->_client_socket[i];   
                  
@@ -136,8 +136,8 @@ void TCPServer::listenSvr() {
  *    Throws: socket_error for recoverable errors, runtime_error for unrecoverable types
  **********************************************************************************************/
 void TCPServer::sendCommands(int clientFd){
-    char *commands = "Server commands:\n\thello\n\t1\n\t2\n\t3\n\t4\n\t5\n\tpasswd\n\texit\n\tmenu\n";
-    if(send(clientFd, commands, strlen(commands), 0) != strlen(commands)){   
+    std::string msg = "Server commands:\n\thello\n\t1\n\t2\n\t3\n\t4\n\t5\n\tpasswd\n\texit\n\tmenu\n";
+    if(send(clientFd, msg.c_str(), msg.size(), 0) != msg.size()){   
         throw socket_error("Send error\n");
     } 
 }
@@ -154,38 +154,38 @@ void TCPServer::handleCommands(int clientFd, char *buffer, int cmdSize, int clie
     for(int i = 0; i < cmdSize-1; i++) {
         cmd += buffer[i];      
     }
-
-   if(cmd.compare("hello") == 0) {
-        char *response = "Hello from server!\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("1") == 0) {
-        char *response = "Option 1\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("2") == 0) {
-        char *response = "Option 2\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("3") == 0) {
-        char *response = "Option 3\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("4") == 0){
-        char *response = "Option 4\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("5") == 0) {
-        char *response = "Option 5\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("passwd") == 0) {
-        char *response = "passwd functionality not yet implemented\n\0";
-        send(clientFd, response, strlen(response), 0);
-   } else if(cmd.compare("exit") == 0) {
-        char *response = "Disconnecting client\n\0";
-        send(clientFd, response, strlen(response), 0);
+    std::string msg;
+    if(cmd.compare("hello") == 0) {
+        msg = "Hello from server!\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("1") == 0) {
+        msg = "Option 1\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("2") == 0) {
+        msg = "Option 2\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("3") == 0) {
+        msg = "Option 3\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("4") == 0){
+        msg = "Option 4\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("5") == 0) {
+        msg = "Option 5\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("passwd") == 0) {
+        msg = "passwd functionality not yet implemented\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
+    } else if(cmd.compare("exit") == 0) {
+        msg = "Disconnecting client\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0);
         closeClient(clientFd, clientSocketNum);
-   } else if(cmd.compare("menu") == 0) {
+    } else if(cmd.compare("menu") == 0) {
         sendCommands(clientFd);
-   } else {
-        char *response = "Invalid selection\n\0";
-        send(clientFd,  response, strlen(response), 0);  
-   }
+    } else {
+        msg = "Invalid selection\n\0";
+        send(clientFd, msg.c_str(), msg.size(), 0); 
+    }
 }
 
 /**********************************************************************************************
@@ -204,7 +204,5 @@ void TCPServer::closeClient(int clientFd, int clientSocketNum) {
     if(close(clientFd) == -1) {
         throw socket_error("Error closing client socket\n");
     }
-    //debug
-    std::cout << "Closing client socket\n";
     this->_client_socket[clientSocketNum] = 0;
 }

@@ -60,28 +60,47 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
  **********************************************************************************************/
 
 void TCPClient::handleConnection() {
-    
+    int sresults;
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100;
+
     while(true) {
         if(isOpen()) {
-            char buffer[socket_bufsize] = {0};
-            //looking for data from server
-            read(this->_connectionFd, buffer, socket_bufsize);
-            //output what was received
-            std::cout << buffer;
-            fflush(stdout);
+            FD_ZERO(&this->_read_fds);
+            FD_SET(STDIN_FILENO, &this->_read_fds);
+            FD_SET(this->_connectionFd, &this->_read_fds);
+            
+            if((sresults = select(this->_connectionFd+1, &this->_read_fds, NULL,NULL, &timeout)) < 0)
+                throw socket_error("Select error\n");
+            
+            if(sresults > 0) {
+                //is there data on stdin? 
+                if(FD_ISSET(STDIN_FILENO, &this->_read_fds)) {
+                    std::string cmd;
+                    std::getline(std::cin,cmd);
+                    int n = cmd.length();
+                    char cmdBuf[n+1];
+                    strncpy(cmdBuf, cmd.c_str(), n);
+                    cmdBuf[n+1] = '\0';
 
-            //read in a line from stdin and format it to send to server
-            std::string cmd;
-            std::getline(std::cin,cmd);
-            int n = cmd.length();
-            char cmdBuf[n+1];
-            strncpy(cmdBuf, cmd.c_str(), n);
-            cmdBuf[n+1] = '\0';
-
-            //send command to server
-            write(this->_connectionFd, cmdBuf, n+1);
+                    //send command to server
+                    int num = write(this->_connectionFd, cmdBuf, n+1);
+                }
+                //is there data coming from the server?
+                if(FD_ISSET(this->_connectionFd, &this->_read_fds)) {
+                    char buffer[socket_bufsize] = {0};
+                    //looking for data from server
+                    if(read(this->_connectionFd, buffer, socket_bufsize) == 0){
+                        return;
+                    }
+                    //output what was received
+                    std::cout << buffer;
+                    fflush(stdout);
+                }
+            }
         } else {
-            close(this->_connectionFd);
+            //socket is closed in main
             return;
         }
     }
